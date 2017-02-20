@@ -51,15 +51,22 @@ gulp.task('zip', () => gulp
 	.pipe(gulp.dest('./'))
 );
 
-gulp.task('upload', () => s3
-	.putObject({
-		Bucket: config.LambdaS3Bucket,
-		Key: config.LambdaS3Key,
-		Body: fs.createReadStream('./dist.zip')
-	})
-	.promise()
-);
+gulp.task('upload', () => {
+  return new Promise((resolve, reject) => {
+    s3.upload({
+  		Bucket: config.LambdaS3Bucket,
+  		Key: config.LambdaS3Key,
+  		Body: fs.createReadStream('./dist.zip')
+  	}, (err, data) => {
+      if (err) {
+        console.log(err);
+        return reject(err);
+      }
 
+      resolve(data);
+    });
+  });
+});
 gulp.task('listStacks', () => cloudFormation
 	.listStacks({
 		StackStatusFilter: [
@@ -107,7 +114,7 @@ gulp.task('updateConfig', () => cloudFormation
 	.promise()
 	.then(data => {
 		console.log(util.inspect(data, {depth:5}));
-		
+
 		const configParams = {
 			'AccessKey': 'accessKeyId',
 			'AccessSecret': 'secretAccessKey'
@@ -115,7 +122,7 @@ gulp.task('updateConfig', () => cloudFormation
 
 		for (const item of data.Stacks[0].Outputs)
 			config[configParams[item.OutputKey]] = item.OutputValue;
-		
+
 		fs.writeFileSync(
 			'./config.json',
 			JSON.stringify(config, null, '\t'),
